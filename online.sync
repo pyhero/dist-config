@@ -1,0 +1,103 @@
+#!/bin/bash
+# sync codes
+# Author: Xu Panda
+# Update: 2015-10-16
+
+help () {
+	echo "Useage:$0 { nginx_web | nginx_php | php | static | pri }"
+	echo -e "\n\tnginx_web: Front-End Nginx.\n\tnginx_php: Back-End Ngixn.\n\tphp: php config.\n\tstatic: Static Nginx.\n\tpri: Private Nginx."
+	exit 2
+}
+[ $# -lt 1 ] && help
+fun=$1
+dir=$(cd `dirname $0`;echo $PWD) && cd $dir
+svnurl="http://svn.aiuv.cc/noc/config"
+conf_dir=config/online
+
+nginx_web () {
+	ips="172.16.0.111 172.16.0.112"
+	ser="nginx"
+	src=$conf_dir/nginx/web/
+	des=/ROOT/conf/nginx/conf-mo/
+}
+
+nginx_php () {
+	ips="172.16.0.141 172.16.0.142"
+	ser="nginx"
+	src=$conf_dir/nginx/php/
+	des=/ROOT/conf/nginx/conf-mo/
+}
+
+static () {
+	ips="172.16.0.121 172.16.0.122"
+	ser="nginx"
+	src=$conf_dir/nginx/static/
+	des=/ROOT/conf/nginx/conf-mo/
+}
+
+pri () {
+	ips="172.16.0.200"
+	ser="nginx"
+	src=$conf_dir/nginx/pri/
+	des=/ROOT/conf/nginx/conf-pri/
+}
+
+php () {
+	ips="172.16.0.141 172.16.0.142 172.16.0.200"
+	ser="php-fpm"
+	src=$conf_dir/php/
+	des=/ROOT/conf/php/php-fpm.d/
+}
+
+global () {
+        global_src=$conf_dir/nginx/global/
+        global_des=/ROOT/conf/nginx/
+        for ip in $ips;do
+		echo -e "\e[32m$ip\e[0m:"
+                rsync --exclude-from=$exclude -avze ssh $global_src $ip:$global_des
+        done
+}
+
+reload_ser () {
+	com="/etc/init.d/$ser reload"
+	0</dev/null ssh $ip $com
+}
+
+sync () {
+	exclude=$dir/exclude/sync.exclude
+	svn co $svnurl
+	for ip in $ips;do
+		echo -e "\e[32m$ip\e[0m:"
+		rsync --delete --exclude-from=$exclude -avze ssh $src $ip:$des
+		reload_ser
+	done
+}
+
+case $1 in
+	nginx_web)
+		nginx_web
+		global
+		sync
+		;;
+	nginx_php)
+		nginx_php
+		global
+		sync
+		;;
+	php)
+		php
+		sync
+		;;
+	static)
+		static
+		global
+		sync
+		;;
+	pri)
+		pri
+		global
+		sync
+		;;
+	*)
+		help
+esac
